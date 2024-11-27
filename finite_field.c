@@ -1,6 +1,6 @@
 #include <finite_field.h>
 
-#define MILLER_RABIN_K 100 // Chances for false positive are 4^(-K) so if k=100 we get 6.22301528 * 10^(-61) :)
+#define MILLER_RABIN_K 100 // Chances for false positive is 4^(-K) so if k=100 we get 6.22301528 * 10^(-61) :)
 
 u64 efficient_pow(u64 a, u64 d, u64 modulus){
     u64 res = 1;
@@ -46,6 +46,46 @@ bool miller_rabin_test(u64 n, unsigned int k){
         }
     }
     return false;
+}
+
+u64 gcd(u64 a, u64 b){
+    u64 r;
+    while (a % b){
+        r = a % b;
+        a = b;
+        b = r;
+    }
+
+    return r;
+}
+
+Pair ext_euclid(u64 a, u64 b){ 
+    u64 unPrev = 1;
+    u64 vnPrev = 0;
+    u64 unCur = 0;
+    u64 vnCur = 1;
+
+    while (b != 0){
+        u64 bn = a; // b
+        u64 newB = a % b;
+        a = b;
+        b = newB;
+
+        // Update coefficients
+        u64 unNew = unPrev - bn * unCur;
+        u64 vnNew = vnPrev - bn * vnCur;
+
+        // Shift coefficients
+        u64 unPrev = unCur;
+        u64 vnPrev = vnCur;
+        unCur = unNew;
+        vnCur = vnNew;
+    }
+    
+    Pair p;
+    p.first = unPrev;
+    p.second = vnPrev;
+    return p;
 }
 
 Fpe Fp_init(u64 value, u64 prime){
@@ -106,5 +146,5 @@ Fpe Fp_inverse(Fpe a){
     if (a.value == 0){
         printf("Error: Fp_inverse: 0 has no inverse!\n"); 
         exit(EXIT_FAILURE);
-    }   
+    }
 }
