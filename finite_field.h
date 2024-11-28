@@ -10,8 +10,10 @@
 #include <math.h>
 #include <sys/types.h>
 #include <stdbool.h>
+#include <immintrin.h>
 
 typedef u_int64_t u64;
+typedef __m256_u u256;
 
 typedef struct{
     u64 first;
