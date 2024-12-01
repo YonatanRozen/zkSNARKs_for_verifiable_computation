@@ -15,7 +15,7 @@
 typedef __uint128_t u128;
 typedef __int128_t i128;
 // typedef __m256_u u256;
-typedef __m256i i256;
+//typedef __m256i i256;
 
 typedef struct{
     u128 first;
