@@ -2,28 +2,28 @@
 
 #define MILLER_RABIN_K 100 // Chances for false positive is 4^(-K) so if k=100 we get 6.22301528 * 10^(-61) :)
 
-u64 efficient_pow(u64 a, u64 d, u64 modulus){
-    u64 res = 1;
-    u64 mul = a; 
+u128 efficient_pow(u128 a, u128 d, u128 modulus){
+    u128 res = 1;
+    u128 mul = a; 
 
     while (a > 0){
         if (a & 1){
-            res = (u64)(res * mul) % modulus;
+            res = (u128)(res * mul) % modulus;
         }
-        mul = (u64)(mul * mul) % modulus;
+        mul = (u128)(mul * mul) % modulus;
         a >>= 1;
     }
     return res;
 }
 
-bool miller_rabin_test(u64 n, unsigned int k){
+bool miller_rabin_test(u128 n, unsigned int k){
     // definitely not a prime
     if (n <= 2 || n % 2 == 0)
         return false;
 
     // factor out powers of 2 from n to find s > 0 and d > 0 s.t n-1=2^(s)*d and d is odd. 
-    u64 s = 0;
-    u64 d = n-1;
+    u128 s = 0;
+    u128 d = n-1;
     while (d % 2 == 0){
         s++;
         d /= 2;
@@ -31,15 +31,15 @@ bool miller_rabin_test(u64 n, unsigned int k){
 
     for (size_t i = 0; i < k; i++)
     {
-        u64 a = (u64)rand() % (n - 3) + 2;   // a should be in the range (2, n-2)
-        u64 x = efficient_pow(a, d, n);
+        u128 a = (u128)rand() % (n - 3) + 2;   // a should be in the range (2, n-2)
+        u128 x = efficient_pow(a, d, n);
         if (x == 1){   // means a^d - 1 = 0 (mod n) so n divides one of the factors of a^(n-1) => \
                                             // n is a prime with high probability (satisfies fermats theorem for random base).
             return true;
         }
-        u64 j = 1;
+        u128 j = 1;
         while (j < s){
-            x = (u64)(x * x) % n;
+            x = (u128)(x * x) % n;
             if (x == n - 1){
                 return true;
             }
@@ -48,8 +48,8 @@ bool miller_rabin_test(u64 n, unsigned int k){
     return false;
 }
 
-u64 gcd(u64 a, u64 b){
-    u64 r;
+u128 gcd(u128 a, u128 b){
+    u128 r;
     while (a % b){
         r = a % b;
         a = b;
@@ -59,36 +59,38 @@ u64 gcd(u64 a, u64 b){
     return r;
 }
 
-Pair ext_euclid(u64 a, u64 b){ 
-    u64 unPrev = 1;
-    u64 vnPrev = 0;
-    u64 unCur = 0;
-    u64 vnCur = 1;
+Triplet ext_euclid(i128 a, i128 b){
+    if (a == 0){
+        Triplet res = {.first = b, .second = 0, .third = 1};
+        return res;
+    }
+
+    i128 unPrev = 1;
+    i128 vnPrev = 0;
+    i128 unCurr = 0;
+    i128 vnCurr = 1;
 
     while (b != 0){
-        u64 bn = a; // b
-        u64 newB = a % b;
+        i128 qn = a / b;
+        i128 rn = a % b;
+
+        i128 unNew = unPrev - qn * unCurr;
+        i128 vnNew = vnPrev - qn * vnCurr;
+
         a = b;
-        b = newB;
+        b = rn;
 
-        // Update coefficients
-        u64 unNew = unPrev - bn * unCur;
-        u64 vnNew = vnPrev - bn * vnCur;
-
-        // Shift coefficients
-        u64 unPrev = unCur;
-        u64 vnPrev = vnCur;
-        unCur = unNew;
-        vnCur = vnNew;
+        unPrev = unCurr;
+        vnPrev = vnCurr;
+        unCurr = unNew;
+        vnCurr = vnNew;
     }
-    
-    Pair p;
-    p.first = unPrev;
-    p.second = vnPrev;
-    return p;
+
+    Triplet res = {.first = a, .second = unPrev, .third = vnPrev};
+    return res;
 }
 
-Fpe Fp_init(u64 value, u64 prime){
+Fpe Fp_init(u128 value, u128 prime){
     if (!miller_rabin_test(prime, MILLER_RABIN_K)){
         printf("Error: Fp_init: 2nd arg isn't a prime with high probability!\n"); 
         exit(EXIT_FAILURE);

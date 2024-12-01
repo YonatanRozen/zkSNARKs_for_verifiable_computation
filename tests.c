@@ -4,17 +4,20 @@
 #include <sys/types.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <stdint.h>
 
-typedef u_int64_t u64;
+typedef __uint128_t u128;
+typedef __int128_t i128;
 
 typedef struct{
-    u64 first;
-    u64 second;
-}Pair;
+    i128 first;
+    i128 second;
+    i128 third;
+}Triplet;
 
-u64 efficient_pow(u64 a, u64 d, u64 modulus){
-    u64 res = 1;
-    u64 mul = a; 
+u128 efficient_pow(u128 a, u128 d, u128 modulus){
+    u128 res = 1;
+    u128 mul = a; 
 
     while (d > 0){
         if (d & 1){
@@ -26,14 +29,14 @@ u64 efficient_pow(u64 a, u64 d, u64 modulus){
     return res;
 }
 
-bool miller_rabin_test(u64 n, unsigned int k){
+bool miller_rabin_test(u128 n, unsigned int k){
     // definitely not a prime
     if (n <= 2 || n % 2 == 0)
         return false;
 
     // factor out powers of 2 from n to find s > 0 and d > 0 s.t n-1=2^(s)*d and d is odd. 
-    u64 s = 0;
-    u64 d = n-1;
+    u128 s = 0;
+    u128 d = n-1;
     while (d % 2 == 0){
         s++;
         d /= 2;
@@ -41,15 +44,15 @@ bool miller_rabin_test(u64 n, unsigned int k){
 
     for (size_t i = 0; i < k; i++)
     {
-        u64 a = (u64)rand() % (n - 3) + 2;   // a should be in the range (2, n-2)
-        u64 x = efficient_pow(a, d, n);
+        u128 a = (u128)rand() % (n - 3) + 2;   // a should be in the range (2, n-2)
+        u128 x = efficient_pow(a, d, n);
         if (x == 1){   // means a^d - 1 = 0 (mod n) so n divides one of the factors of a^(n-1) => \
                                             // n is a prime with high probability (satisfies fermats theorem for random base).
             return true;
         }
-        u64 j = 1;
+        u128 j = 1;
         while (j < s){
-            x = (u64)(x * x) % n;
+            x = (u128)(x * x) % n;
             if (x == n - 1){
                 return true;
             }
@@ -58,8 +61,8 @@ bool miller_rabin_test(u64 n, unsigned int k){
     return false;
 }
 
-u64 gcd(u64 a, u64 b){ 
-    u64 r;
+i128 gcd(i128 a, i128 b){ 
+    i128 r;
     while (a % b){
         r = a % b;
         a = b;
@@ -68,39 +71,41 @@ u64 gcd(u64 a, u64 b){
     return r;
 }
 
-Pair ext_euclid(u64 a, u64 b){ 
-    u64 unPrev = 1;
-    u64 vnPrev = 0;
-    u64 unCur = 0;
-    u64 vnCur = 1;
+Triplet ext_euclid(i128 a, i128 b){
+    if (a == 0){
+        Triplet res = {.first = b, .second = 0, .third = 1};
+        return res;
+    }
+
+    i128 unPrev = 1;
+    i128 vnPrev = 0;
+    i128 unCurr = 0;
+    i128 vnCurr = 1;
 
     while (b != 0){
-        u64 bn = a; // b
-        u64 newB = a % b;
+        i128 qn = a / b;
+        i128 rn = a % b;
+
+        i128 unNew = unPrev - qn * unCurr;
+        i128 vnNew = vnPrev - qn * vnCurr;
+
         a = b;
-        b = newB;
+        b = rn;
 
-        // Update coefficients
-        u64 unNew = unPrev - bn * unCur;
-        u64 vnNew = vnPrev - bn * vnCur;
-
-        // Shift coefficients
-        unPrev = unCur;
-        vnPrev = vnCur;
-        unCur = unNew;
-        vnCur = vnNew;
+        unPrev = unCurr;
+        vnPrev = vnCurr;
+        unCurr = unNew;
+        vnCurr = vnNew;
     }
-    
-    Pair p;
-    p.first = unPrev;
-    p.second = vnPrev;
-    return p;
+
+    Triplet res = {.first = a, .second = unPrev, .third = vnPrev};
+    return res;
 }
 
 void test_efficient_pow(){
-    u64 a = 2;
-    u64 d = 3;
-    u64 n = 5;
+    u128 a = 2;
+    u128 d = 3;
+    u128 n = 5;
     assert(efficient_pow(a, d, n) == 3);
 }
 
@@ -128,10 +133,45 @@ void test_gcd(){
     assert(gcd(2,8)==2);
 }
 
-void test_ext_euclid(){
-    Pair res1 = ext_euclid(23, 70);
-    printf("Ext euclid 1: (%lu,%lu), %lu\n", res1.first, res1.second, (23*res1.first + 70*res1.second));
+// Prints a 128 bit integer.
+// I didn't write it myself but it works :)
+void print_int128(__int128_t value) {
+    if (value < 0) {
+        putchar('-');
+        value = -value;
+    }
+    if (value > UINT64_MAX) {
+        print_int128(value / 1000000000000000000);
+        printf("%018lu", (uint64_t)(value % 1000000000000000000));
+    } else {
+        printf("%lu", (uint64_t)value);
+    }
 }
+
+void test_ext_euclid() {
+    __int128_t a = 104; // Example values
+    __int128_t b = 47;
+
+    Triplet result = ext_euclid(a, b);
+    assert(a * result.second + b * result.third == result.first);
+    // Loooooooooooooong print for sanity check
+    printf("GCD(");
+    print_int128(a);
+    printf(",");
+    print_int128(b);
+    printf(") = ");
+    print_int128(result.first);
+    printf(" = ");
+    print_int128(result.second);
+    printf(" * ");
+    print_int128(a);
+    printf(" + ");
+    print_int128(result.third);
+    printf(" * ");
+    print_int128(b);
+    printf("\n");
+}
+
 
 int main(){
     test_efficient_pow();
