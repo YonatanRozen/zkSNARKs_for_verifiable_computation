@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <immintrin.h>
 
+#define MILLER_RABIN_K 100 // Chances for false positive is 4^(-K) so if k=100 we get 6.22301528 * 10^(-61) :)
 typedef __uint128_t u128;
 typedef __int128_t i128;
 // typedef __m256_u u256;
@@ -28,15 +29,15 @@ typedef struct{
     u128 prime;
 }Fpe;
 
-u128 efficient_pow(u128 a, u128 d, u128 modulus);
-bool miller_rabin_test(u128 n, unsigned int k);
+u128 epow(u128 a, u128 d, u128 modulus);
+bool miller_rabin_test(u128 n);
 u128 gcd(u128 a, u128 b);
-Fpe Fp_Init(u128 value, u128 prime);
-Fpe Fp_add(Fpe a, Fpe b);
-Fpe Fp_neg(Fpe a);
-Fpe Fp_sub(Fpe a, Fpe b);
-Fpe Fp_mul(Fpe a, Fpe b);
-Fpe Fp_inverse(Fpe a);
+Fpe fp_init(u128 value, u128 prime);
+Fpe fp_add(Fpe a, Fpe b);
+Fpe fp_neg(Fpe a);
+Fpe fp_sub(Fpe a, Fpe b);
+Fpe fp_mul(Fpe a, Fpe b);
+Fpe fp_inverse(Fpe a);
 
 #endif
 

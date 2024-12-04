@@ -1,8 +1,6 @@
 #include <finite_field.h>
 
-#define MILLER_RABIN_K 100 // Chances for false positive is 4^(-K) so if k=100 we get 6.22301528 * 10^(-61) :)
-
-u128 efficient_pow(u128 a, u128 d, u128 modulus){
+u128 epow(u128 a, u128 d, u128 modulus){
     u128 res = 1;
     u128 mul = a; 
 
@@ -16,7 +14,7 @@ u128 efficient_pow(u128 a, u128 d, u128 modulus){
     return res;
 }
 
-bool miller_rabin_test(u128 n, unsigned int k){
+bool miller_rabin_test(u128 n){
     // definitely not a prime
     if (n <= 2 || n % 2 == 0)
         return false;
@@ -29,10 +27,10 @@ bool miller_rabin_test(u128 n, unsigned int k){
         d /= 2;
     }
 
-    for (size_t i = 0; i < k; i++)
+    for (size_t i = 0; i < MILLER_RABIN_K; i++)
     {
         u128 a = (u128)rand() % (n - 3) + 2;   // a should be in the range (2, n-2)
-        u128 x = efficient_pow(a, d, n);
+        u128 x = epow(a, d, n);
         if (x == 1){   // means a^d - 1 = 0 (mod n) so n divides one of the factors of a^(n-1) => \
                                             // n is a prime with high probability (satisfies fermats theorem for random base).
             return true;
@@ -91,11 +89,11 @@ Triplet ext_euclid(i128 a, i128 b){
 }
 
 Fpe Fp_init(u128 value, u128 prime){
-    if (!miller_rabin_test(prime, MILLER_RABIN_K)){
+    if (!miller_rabin_test(prime)){
         printf("Error: Fp_init: 2nd arg isn't a prime with high probability!\n"); 
         exit(EXIT_FAILURE);
-    }else if(value > prime){
-        printf("Error: Fp_init: 1st arg isn't in range {0,...,prime}!\n");
+    }else if(value >= prime){
+        printf("Error: Fp_init: 1st arg isn't in range {0,...,p-1}!\n");
         exit(EXIT_FAILURE);
     }
     Fpe elem;
@@ -104,7 +102,7 @@ Fpe Fp_init(u128 value, u128 prime){
     return elem;
 }
 
-Fpe Fp_add(Fpe a, Fpe b){
+Fpe fp_add(Fpe a, Fpe b){
     if (a.prime != b.prime){
         printf("Error: Fp_add: trying to add elements from different fields!\n"); 
         exit(EXIT_FAILURE);
@@ -116,7 +114,7 @@ Fpe Fp_add(Fpe a, Fpe b){
     return elem;
 }
 
-Fpe Fp_neg(Fpe a){
+Fpe fp_neg(Fpe a){
     Fpe elem;
     elem.value = a.prime - a.value;     // For example in p=5 -2 = 3 = 5-2 
     elem.prime = a.prime;
@@ -128,12 +126,12 @@ Fpe Fp_sub(Fpe a, Fpe b){
         printf("Error: Fp_sub: trying to sub elements from different fields!\n"); 
         exit(EXIT_FAILURE);
     }
-    Fpe elem = Fp_neg(b);   // -b
+    Fpe elem = fp_neg(b);   // -b
     elem.value = (elem.value + a.value) % elem.prime;   // (-b + a) % p
     return elem;
 }
 
-Fpe Fp_mul(Fpe a, Fpe b){
+Fpe fp_mul(Fpe a, Fpe b){
     if (a.prime != b.prime){
         printf("Error: Fp_mul: trying to mul elements from different fields!\n"); 
         exit(EXIT_FAILURE);
@@ -144,7 +142,7 @@ Fpe Fp_mul(Fpe a, Fpe b){
     return elem;
 }
 
-Fpe Fp_inverse(Fpe a){
+Fpe fp_inverse(Fpe a){
     if (a.value == 0){
         printf("Error: Fp_inverse: 0 has no inverse!\n"); 
         exit(EXIT_FAILURE);

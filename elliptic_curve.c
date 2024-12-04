@@ -34,7 +34,15 @@ bool ecp_equals(ECP p, ECP q){
 }
 
 ECP ec_add(ECP p, ECP q){
-    
+    if (ecp_equals(p, q)){
+        ECP res = {.x = 1, .y = 2, .is_infinity = true}; // garbage in a and b, won't use them anyway.
+        return res;
+    }else if (p.is_infinity){
+        return q;
+    }else if (q.is_infinity){
+        return p;
+    }
+
 }
 
 ECP ec_neg(ECP p){
