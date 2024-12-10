@@ -1,107 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include <sys/types.h>
+#include <math.h>
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
-
-#define MILLER_RABIN_K 100 // Chances for false positive is 4^(-K) so if k=100 we get 6.22301528 * 10^(-61) :)
-typedef __uint128_t u128;
-typedef __int128_t i128;
-
-typedef struct{
-    i128 first;
-    i128 second;
-    i128 third;
-}Triplet;
-
-u128 epow(u128 a, u128 d, u128 modulus){
-    u128 res = 1;
-    u128 mul = a; 
-
-    while (d > 0){
-        if (d & 1){
-            res = (res * mul) % modulus;
-        }
-        mul = (mul * mul) % modulus;
-        d >>= 1;
-    }
-    return res;
-}
-
-bool miller_rabin_test(u128 n){
-    // definitely not a prime
-    if (n <= 2 || n % 2 == 0)
-        return false;
-
-    // factor out powers of 2 from n to find s > 0 and d > 0 s.t n-1=2^(s)*d and d is odd. 
-    u128 s = 0;
-    u128 d = n-1;
-    while (d % 2 == 0){
-        s++;
-        d /= 2;
-    }
-
-    for (size_t i = 0; i < MILLER_RABIN_K; i++)
-    {
-        u128 a = (u128)rand() % (n - 3) + 2;   // a should be in the range (2, n-2)
-        u128 x = epow(a, d, n);
-        if (x == 1){   // means a^d - 1 = 0 (mod n) so n divides one of the factors of a^(n-1) => \
-                                            // n is a prime with high probability (satisfies fermats theorem for random base).
-            return true;
-        }
-        u128 j = 1;
-        while (j < s){
-            x = (u128)(x * x) % n;
-            if (x == n - 1){
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-i128 gcd(i128 a, i128 b){ 
-    i128 r;
-    while (a % b){
-        r = a % b;
-        a = b;
-        b = r;
-    }
-    return r;
-}
-
-Triplet ext_euclid(i128 a, i128 b){
-    if (a == 0){
-        Triplet res = {.first = b, .second = 0, .third = 1};
-        return res;
-    }
-
-    i128 unPrev = 1;
-    i128 vnPrev = 0;
-    i128 unCurr = 0;
-    i128 vnCurr = 1;
-
-    while (b != 0){
-        i128 qn = a / b;
-        i128 rn = a % b;
-
-        i128 unNew = unPrev - qn * unCurr;
-        i128 vnNew = vnPrev - qn * vnCurr;
-
-        a = b;
-        b = rn;
-
-        unPrev = unCurr;
-        vnPrev = vnCurr;
-        unCurr = unNew;
-        vnCurr = vnNew;
-    }
-
-    Triplet res = {.first = a, .second = unPrev, .third = vnPrev};
-    return res;
-}
+#include "finite_field.h"
+#include "elliptic_curve.h"
 
 void test_efficient_pow(){
     u128 a = 2;
@@ -132,21 +37,6 @@ void test_gcd(){
     assert(gcd(7,5)==1);
     assert(gcd(7,90)==1);
     assert(gcd(2,8)==2);
-}
-
-// Prints a 128 bit integer.
-// I didn't write it myself but it works :)
-void print_int128(__int128_t value) {
-    if (value < 0) {
-        putchar('-');
-        value = -value;
-    }
-    if (value > UINT64_MAX) {
-        print_int128(value / 1000000000000000000);
-        printf("%018lu", (uint64_t)(value % 1000000000000000000));
-    } else {
-        printf("%lu", (uint64_t)value);
-    }
 }
 
 void test_ext_euclid() {
@@ -197,11 +87,49 @@ void test_ext_euclid() {
     // printf("\n");
 }
 
+void test_tonelli_shanks(){
+    Fpe a1 = fp_init(58, 101);
+    Fpe r1_1 =  fp_init(82, 101);
+    Fpe r1_2 = fp_init(19, 101);
+    Pair res1 = tonelli_shanks(a1);
+    // printf("1st root: ");
+    // print_int128(res1.first.value);
+    // printf("2nd root: ");
+    // print_int128(res1.second.value);
+    assert((fp_equals(res1.first, r1_1) && fp_equals(res1.second, r1_2)) ||
+           ((fp_equals(res1.first, r1_2) && fp_equals(res1.second, r1_1))));
+    
+    Fpe a2 = fp_init(111, 113);
+    Fpe r2_1 =  fp_init(87, 113);
+    Fpe r2_2 = fp_init(26, 113);
+    Pair res2 = tonelli_shanks(a2);
+    // printf("1st root: ");
+    // print_int128(res2.first.value);
+    // printf("2nd root: ");
+    // print_int128(res2.second.value);
+    assert((fp_equals(res2.first, r2_1) && fp_equals(res2.second, r2_2)) ||
+           ((fp_equals(res2.first, r2_2) && fp_equals(res2.second, r2_1))));
+}
+
+void test_elliptic_curves_initialization(){
+    
+}
+
+void test_other_things(){
+    // Test if conversion to double happens in pow
+    u128 m = 41;
+    u128 y = epow(2, m / 4, 0);
+    //print_int128(y);
+    assert(y == 1024);
+}
 
 int main(){
     test_efficient_pow();
     test_miller_rabin();
     test_gcd();
     test_ext_euclid();
+    test_tonelli_shanks();
+    test_elliptic_curves_initialization();
+    test_other_things();
     return 0;
 }
