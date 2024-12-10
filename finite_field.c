@@ -1,16 +1,42 @@
-#include <finite_field.h>
+#include "finite_field.h"
+
+// Prints a 128 bit integer.
+// I didn't write it myself but it works :)
+void print_int128(__int128_t value) {
+    if (value < 0) {
+        putchar('-');
+        value = -value;
+    }
+    if (value > UINT64_MAX) {
+        print_int128(value / 1000000000000000000);
+        printf("%018lu\n", (uint64_t)(value % 1000000000000000000));
+    } else {
+        printf("%lu\n", (uint64_t)value);
+    }
+}
 
 u128 epow(u128 a, u128 d, u128 modulus){
     u128 res = 1;
     u128 mul = a; 
 
-    while (a > 0){
-        if (a & 1){
-            res = (u128)(res * mul) % modulus;
+    if (modulus != 0){
+        while (d > 0){
+            if (d & 1){
+                res = (res * mul) % modulus;
+            }
+            mul = (mul * mul) % modulus;
+            d >>= 1;
         }
-        mul = (u128)(mul * mul) % modulus;
-        a >>= 1;
+    }else{
+        while (d > 0){
+            if (d & 1){
+                res = (res * mul);
+            }
+            mul = (mul * mul);
+            d >>= 1;
+        }
     }
+    
     return res;
 }
 
@@ -88,18 +114,28 @@ Triplet ext_euclid(i128 a, i128 b){
     return res;
 }
 
-Fpe Fp_init(u128 value, u128 prime){
+Fpe fp_init(u128 value, u128 prime){
     if (!miller_rabin_test(prime)){
-        printf("Error: Fp_init: 2nd arg isn't a prime with high probability!\n"); 
+        printf("Error: fp_init: 2nd arg isn't a prime with high probability!\n"); 
         exit(EXIT_FAILURE);
     }else if(value >= prime){
-        printf("Error: Fp_init: 1st arg isn't in range {0,...,p-1}!\n");
+        printf("Error: fp_init: 1st arg isn't in range {0,...,p-1}!\n");
         exit(EXIT_FAILURE);
     }
+    
     Fpe elem;
     elem.value = value;
     elem.prime = prime;
     return elem;
+}
+
+bool fp_equals(Fpe a, Fpe b){
+    if (a.prime != b.prime){
+        printf("Error: fp_equals: a and b aren't in the same field!\n"); 
+        exit(EXIT_FAILURE);
+    }
+
+    return a.value == b.value;
 }
 
 Fpe fp_add(Fpe a, Fpe b){
@@ -133,13 +169,37 @@ Fpe Fp_sub(Fpe a, Fpe b){
 
 Fpe fp_mul(Fpe a, Fpe b){
     if (a.prime != b.prime){
-        printf("Error: Fp_mul: trying to mul elements from different fields!\n"); 
+        printf("Error: fp_mul: a or b aren't in F[p]!\n");
         exit(EXIT_FAILURE);
     }
+
     Fpe elem;
-    elem.value = (a.value * b.value) % a.prime;   
+    elem.value = (a.value * b.value) % a.prime;
     elem.prime = a.prime;
     return elem;
+}
+
+Fpe fp_smul(u128 a, Fpe b){
+    Fpe elem;
+    elem.value = (a * b.value) % b.prime;   
+    elem.prime = b.prime;
+    return elem;
+}
+
+Fpe fp_pow(Fpe a, u128 b){
+    Fpe elem;
+    elem.value = epow(a.value, b, a.prime);   
+    elem.prime = a.prime;
+    return elem;
+}
+
+// The algorithm uses euler's criterion internally to check if a is a QR mod p.
+bool is_qr(Fpe a){
+    if (a.value == 0){
+        return false;
+    }
+    Fpe one = fp_init(1, a.prime);
+    return fp_equals(fp_pow(a, (a.prime - 1) / 2), one);
 }
 
 Fpe fp_inverse(Fpe a){
@@ -147,4 +207,86 @@ Fpe fp_inverse(Fpe a){
         printf("Error: Fp_inverse: 0 has no inverse!\n"); 
         exit(EXIT_FAILURE);
     }
+
+    Triplet extEuclidRes = ext_euclid(a.value, a.prime); // find k, l s.t a * k + p * l = 1
+    Fpe res = {.value = extEuclidRes.second, .prime = a.prime};
+    return res; 
+}
+
+Pair tonelli_shanks(Fpe a){
+    if (!is_qr(a)){
+        printf("Error: fp_qr: a isn't a qr!\n");
+        exit(EXIT_FAILURE);
+    }  
+
+    Pair res;
+    u128 p = a.prime;
+    Fpe one = fp_init(1, p);
+    // Case 1: p=2 => root is a
+    if (p == 2){
+        res.first = a;
+        res.second = a;
+        return res;
+    }else if (p % 4 == 3){    // Case 2: p=4n+3 for some n => root is +-a^((p+1)/4)
+        Fpe r = fp_pow(a, (p + 1) / 4);
+        res.first = r;
+        res.second = fp_neg(r);
+        return res;
+    }else if (p % 8 == 5){    // Case 3: p=8n+5 for some n => root is +-av(i-1) where v=(2a)^((p-5)/8), i=2av^2
+        Fpe v = fp_pow(fp_smul(2, a), (p - 5) / 8);
+        Fpe i = fp_smul(2, fp_mul(a, fp_pow(v, 2)));
+        res.first = fp_mul(a, fp_mul(v, fp_add(i, fp_neg(one))));
+        res.second = fp_neg(res.first);
+        return res;
+    }
+
+    // Case 4: p=8n+1 for some n => very long computation. 
+    // 1st step: factor p to 2^e*q + 1 where q is odd
+    u128 e = 0;
+    u128 q = p - 1;
+    while (q % 2 == 0){
+        e++;
+        q /= 2;
+    }
+    // 2nd step: generate random x s.t 1 < x < p until x^(q*(2^(e-1)))=1 (mod p) satisfies 
+    Fpe x = fp_init((u128)rand() % (p - 2) + 2, p);   // x should be in the range [2, p-1]
+    u128 expo = (u128)epow(2, e-1, 0);
+    Fpe z = fp_pow(x, q);
+    Fpe z2e = fp_pow(z, expo);
+    while (fp_equals(z, one)){
+        x = fp_init((u128)rand() % (p - 2) + 2, p);
+        z2e = fp_pow(z, expo);
+        
+    }
+
+    // 3rd step: set y <- z, r <- e, x <- a^((q-1)/2) (mod p), v <- ax (mod p), w <- vx (mod p)
+    Fpe y = z;
+    u128 r = e;
+    x = fp_pow(a, (q - 1) / 2);
+    Fpe v = fp_mul(a, x);
+    Fpe w = fp_mul(v, x);
+    // 4th step: if w = 1 (mod p) return +-v as the root. else enter \ continue loop
+    while (!fp_equals(w, one)){
+        // 5th step: find smallest k s.t w^(2^k)=1 (mod p)
+        u128 k = 1; // We already know that w = w^(2^0) != 1 (mod p)
+        u128 temp = epow(2, k, 0);
+        Fpe w_2k = fp_pow(w, temp);
+        while (!fp_equals(w_2k, one)){
+            k++;
+            temp = epow(2, k, 0);
+            w_2k = fp_pow(w, temp);
+        }
+        // 6th step: set d <- y^(2^(r-k-1)) (mod p), y <- d^2 (mod p), r <- k, v <- dv (mod p), w <- wy (mod p)
+        temp = epow(2, r - k - 1, 0);
+        Fpe d = fp_pow(y, temp);
+        y = fp_pow(d, 2);
+        r = k;
+        v = fp_mul(d, v);
+        w = fp_mul(w, y);
+
+        //7th step: Back to step 4...
+    } 
+    res.first = v;
+    res.second = fp_neg(v);
+    return res; 
 }
